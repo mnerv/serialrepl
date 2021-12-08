@@ -9,14 +9,13 @@
 #define ASIO_STANDALONE
 #include "asio.hpp"
 
-constexpr auto BUFFER_SIZE = 256;
-
-constexpr auto USAGE = R"(
-usage: HelloSerial [commands] [port]
-)";
+constexpr auto BUFFER_SIZE = 1024;
+constexpr auto USAGE =
+"usage: HelloSerial [commands] [port]";
 
 std::mutex mutex;
 char raw_buffer[BUFFER_SIZE];
+char print_buffer[BUFFER_SIZE + 1];
 char eol = '\r';
 
 auto read_data(asio::serial_port& serial) -> void {
@@ -28,15 +27,17 @@ auto read_data(asio::serial_port& serial) -> void {
                     return;
                 }
                 for (int32_t i = 0; i < int32_t(length); i++)
-                    std::cout << raw_buffer[i];
+                    print_buffer[i] = raw_buffer[i];
+                print_buffer[length] = '\0';
+                std::cout << print_buffer;
                 std::cout << '\n';
                 read_data(serial);
             });
 }
 
-auto main([[maybe_unused]]int32_t argc, [[maybe_unused]]char const* argv[]) -> int32_t {
+auto main(int32_t argc, char const* argv[]) -> int32_t {
     if (argc < 3) {
-        std::cout << USAGE;
+        std::cout << USAGE << '\n';
         return 1;
     };
     asio::error_code ec;
@@ -46,17 +47,16 @@ auto main([[maybe_unused]]int32_t argc, [[maybe_unused]]char const* argv[]) -> i
     std::string port{argv[2]};
 
     asio::io_service io_service;
-    // Make the context idle so we don't exit the program
-    asio::io_context::work idle_work(io_service);
-    // Start in another thread
-    std::thread thread_context = std::thread([&]() { io_service.run(); });
-
+    asio::io_service::work idle_work(io_service);
+    std::thread thread_context([&]() { io_service.run(); });
     asio::serial_port serial(io_service);
 
     std::cout << "Opening Serial Port... ";
     serial.open(port, ec);
     if (ec) {
         std::cerr << ec.message() << '\n';
+        io_service.stop();
+        thread_context.join();
         return 1;
     }
     serial.set_option(asio::serial_port_base::baud_rate(115200));
@@ -71,13 +71,14 @@ auto main([[maybe_unused]]int32_t argc, [[maybe_unused]]char const* argv[]) -> i
         std::string input;
         std::cout << "> ";
         std::cin >> input;
-        //serial.write_some(asio::buffer(input.data(), input.size()), ec);
         if (input.size() == 0)
             continue;
-        serial.write_some(asio::buffer(input + "\r"), ec);
+        input += eol;
+        serial.write_some(asio::buffer(input.data(), input.size()), ec);
         std::this_thread::sleep_for(125ms);
     }
 
+    io_service.stop();
     thread_context.join();
 
     return 0;
