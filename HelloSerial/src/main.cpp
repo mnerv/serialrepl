@@ -10,13 +10,17 @@
 #include "asio.hpp"
 
 constexpr auto BUFFER_SIZE = 1024;
-constexpr auto USAGE =
-"usage: HelloSerial [commands] [port]";
 
 std::mutex mutex;
 char raw_buffer[BUFFER_SIZE];
 char print_buffer[BUFFER_SIZE + 1];
 char eol = '\r';
+
+auto print_usage([[maybe_unused]]int32_t argc, char const* argv[]) -> void {
+    std::cout << "usage: " << argv[0] << " <serial_port> <commands_file>\n\n";
+    std::cout << "  serial_port:    serial port  (required)\n";
+    std::cout << "  command_file:   command file (optional)\n";
+}
 
 auto read_data(asio::serial_port& serial) -> void {
     serial.async_read_some(asio::buffer(raw_buffer, BUFFER_SIZE),
@@ -36,22 +40,22 @@ auto read_data(asio::serial_port& serial) -> void {
 }
 
 auto main(int32_t argc, char const* argv[]) -> int32_t {
-    if (argc < 3) {
-        std::cout << USAGE << '\n';
+    if (argc < 2) {
+        print_usage(argc, argv);
         return 1;
     };
     asio::error_code ec;
 
     using namespace std::chrono_literals;
-    std::string commands_file{argv[1]};
-    std::string port{argv[2]};
+    std::string port{argv[1]};
+    //std::string commands_file{argv[2]};
 
     asio::io_service io_service;
     asio::io_service::work idle_work(io_service);
     std::thread thread_context([&]() { io_service.run(); });
     asio::serial_port serial(io_service);
 
-    std::cout << "Opening Serial Port... ";
+    std::cout << "opening serial port...\n";
     serial.open(port, ec);
     if (ec) {
         std::cerr << ec.message() << '\n';
@@ -64,7 +68,7 @@ auto main(int32_t argc, char const* argv[]) -> int32_t {
     serial.set_option(asio::serial_port_base::stop_bits(asio::serial_port_base::stop_bits::one));
     serial.set_option(asio::serial_port_base::parity(asio::serial_port_base::parity::none));
     serial.set_option(asio::serial_port_base::flow_control(asio::serial_port_base::flow_control::none));
-    std::cout << "Opened!\n";
+    std::cout << "opened port: " << port << "\n";
 
     read_data(serial);
     while(true) {
