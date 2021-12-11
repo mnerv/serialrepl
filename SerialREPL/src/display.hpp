@@ -16,6 +16,7 @@ class display {
   private:
     int32_t m_width;
     int32_t m_height;
+    WINDOW* m_window;
 };
 
 }

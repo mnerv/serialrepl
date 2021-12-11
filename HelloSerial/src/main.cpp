@@ -50,16 +50,16 @@ auto main(int32_t argc, char const* argv[]) -> int32_t {
     std::string port{argv[1]};
     //std::string commands_file{argv[2]};
 
-    asio::io_service io_service;
-    asio::io_service::work idle_work(io_service);
-    std::thread thread_context([&]() { io_service.run(); });
-    asio::serial_port serial(io_service);
+    asio::io_context io_context;
+    asio::io_service::work idle_work(io_context);
+    std::thread thread_context([&]() { io_context.run(); });
+    asio::serial_port serial(io_context);
 
     std::cout << "opening serial port...\n";
     serial.open(port, ec);
     if (ec) {
         std::cerr << ec.message() << '\n';
-        io_service.stop();
+        io_context.stop();
         thread_context.join();
         return 1;
     }
@@ -82,7 +82,7 @@ auto main(int32_t argc, char const* argv[]) -> int32_t {
         std::this_thread::sleep_for(125ms);
     }
 
-    io_service.stop();
+    io_context.stop();
     thread_context.join();
 
     return 0;

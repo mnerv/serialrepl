@@ -7,7 +7,7 @@ namespace sr {
 
 display::display() {
     setlocale(LC_ALL, "");
-    initscr();
+    m_window = initscr();
 
     keypad(stdscr, true);
     mousemask(ALL_MOUSE_EVENTS | REPORT_MOUSE_POSITION, nullptr);
