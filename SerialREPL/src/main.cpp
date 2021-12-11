@@ -19,8 +19,48 @@
 
 #include "display.hpp"
 
+constexpr std::size_t BUFFER_SIZE = 1024;
+
 std::vector<std::string> history;
 std::vector<std::string> outputs;
+std::mutex mutex;
+WINDOW* infowin  = nullptr;
+WINDOW* inputwin = nullptr;
+WINDOW* outputwin = nullptr;
+char raw_buffer[BUFFER_SIZE];
+char eol = '\r';
+
+auto read_data(asio::serial_port& serial) -> void {
+    serial.async_read_some(asio::buffer(raw_buffer, BUFFER_SIZE),
+            [&](asio::error_code const& ec, std::size_t length) {
+                std::scoped_lock<std::mutex> lock(mutex);
+                std::string output;
+                if (ec) {
+                    read_data(serial);
+                    return;
+                }
+                for (int32_t i = 0; i < int32_t(length); i++)
+                    output += raw_buffer[i];
+
+                if (outputwin != nullptr) {
+                    outputs.push_back(output);
+
+                    auto output_size = outputs.size();
+                    wclear(outputwin);
+                    auto out_height = getmaxy(outputwin);
+                    int32_t row = 0;
+                    for (int32_t i = int32_t(output_size); i > -1; i--) {
+                        mvwprintw(outputwin, out_height - row, 1, "%s", outputs[i].c_str());
+                        row++;
+                    }
+                    wrefresh(outputwin);
+
+                    box(infowin, 0, 0);
+                    wrefresh(infowin);
+                }
+                read_data(serial);
+            });
+}
 
 auto main([[maybe_unused]]int32_t argc, [[maybe_unused]]char const* argv[]) -> int32_t {
     sr::display display;
@@ -32,9 +72,9 @@ auto main([[maybe_unused]]int32_t argc, [[maybe_unused]]char const* argv[]) -> i
     noecho();
     cbreak();  // Breaks out of the program when ^C
     //raw();     // Raw key input
-    auto infowin = newwin(3, display.get_width(), 0, 0);
-    auto inputwin = newwin(3, display.get_width(), display.get_height() - 4, 0);
-    auto outputwin = newwin(display.get_height() - 6, display.get_width(), 2, 0);
+    infowin = newwin(3, display.get_width(), 0, 0);
+    inputwin = newwin(3, display.get_width(), display.get_height() - 4, 0);
+    outputwin = newwin(display.get_height() - 6, display.get_width(), 2, 0);
     refresh();
 
     wrefresh(outputwin);
@@ -45,9 +85,33 @@ auto main([[maybe_unused]]int32_t argc, [[maybe_unused]]char const* argv[]) -> i
     wrefresh(inputwin);
     keypad(inputwin, true);
 
-    [[maybe_unused]]int32_t history_index = -1;
+    int32_t history_index = -1;
     bool is_running       = true;
     std::string input{};
+
+    using namespace std::chrono_literals;
+    std::string port{argv[1]};
+
+    asio::error_code ec;
+    asio::io_context io_context;
+    asio::io_service::work idle_work(io_context);
+    std::thread thread_context([&]() { io_context.run(); });
+    asio::serial_port serial(io_context);
+
+    serial.open(port, ec);
+    if (ec) {
+        std::cerr << ec.message() << '\n';
+        io_context.stop();
+        thread_context.join();
+        return 1;
+    }
+    serial.set_option(asio::serial_port_base::baud_rate(115200));
+    serial.set_option(asio::serial_port_base::character_size(8));
+    serial.set_option(asio::serial_port_base::stop_bits(asio::serial_port_base::stop_bits::one));
+    serial.set_option(asio::serial_port_base::parity(asio::serial_port_base::parity::none));
+    serial.set_option(asio::serial_port_base::flow_control(asio::serial_port_base::flow_control::none));
+
+    read_data(serial);
 
     wmove(inputwin, 1, 1);
     while(is_running) {
@@ -59,8 +123,8 @@ auto main([[maybe_unused]]int32_t argc, [[maybe_unused]]char const* argv[]) -> i
         // read user input
         auto c = wgetch(inputwin);
 
-        mvwprintw(outputwin, 1, 1, "%d", c);
-        wrefresh(outputwin);
+        //mvwprintw(outputwin, 1, 1, "%d", c);
+        //wrefresh(outputwin);
 
         if (c == 127 || c == 263) {
             input.pop_back();
@@ -84,6 +148,7 @@ auto main([[maybe_unused]]int32_t argc, [[maybe_unused]]char const* argv[]) -> i
 
             history.push_back(input);
             outputs.push_back(input);
+            serial.write_some(asio::buffer(input.data(), input.size()), ec);
             input = "";
 
             auto output_size = outputs.size();
@@ -100,6 +165,9 @@ auto main([[maybe_unused]]int32_t argc, [[maybe_unused]]char const* argv[]) -> i
             wrefresh(infowin);
         }
     }
+
+    io_context.stop();
+    thread_context.join();
 
     return 0;
 }
