@@ -1,3 +1,11 @@
+/**
+ * @file   main.cpp
+ * @author Pratchaya Khansomboon (pratchaya.k.git@gmail.com)
+ * @brief  Simple Serial REPL program with ncurses
+ * @date   2021-12-11
+ *
+ * @copyright Copyright (c) 2021
+ */
 #include <iostream>
 #include <fstream>
 #include <thread>
