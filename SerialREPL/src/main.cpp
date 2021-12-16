@@ -79,6 +79,7 @@ auto main([[maybe_unused]]int32_t argc, [[maybe_unused]]char const* argv[]) -> i
 
     wrefresh(outputwin);
     mvwprintw(infowin, 1, 1, "port: /dev/tty.usbserial-014CA306  baudrate: 115200");
+    wrefresh(outputwin);
     box(infowin, 0, 0);
     wrefresh(infowin);
     box(inputwin, 0, 0);
@@ -111,6 +112,7 @@ auto main([[maybe_unused]]int32_t argc, [[maybe_unused]]char const* argv[]) -> i
     serial.set_option(asio::serial_port_base::parity(asio::serial_port_base::parity::none));
     serial.set_option(asio::serial_port_base::flow_control(asio::serial_port_base::flow_control::none));
 
+    wclear(outputwin);
     read_data(serial);
 
     wmove(inputwin, 1, 1);
@@ -145,10 +147,13 @@ auto main([[maybe_unused]]int32_t argc, [[maybe_unused]]char const* argv[]) -> i
         if (c == '\n') {
             if (input == "exit")
                 is_running = false;
-
-            history.push_back(input);
-            outputs.push_back(input);
-            serial.write_some(asio::buffer(input.data(), input.size()), ec);
+            if (input == "clear")
+                outputs.clear();
+            else {
+                history.push_back(input);
+                outputs.push_back(input);
+                serial.write_some(asio::buffer(input.data(), input.size()), ec);
+            }
             input = "";
 
             auto output_size = outputs.size();

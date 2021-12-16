@@ -25,7 +25,7 @@ auto print_usage([[maybe_unused]]int32_t argc, char const* argv[]) -> void {
 auto read_data(asio::serial_port& serial) -> void {
     serial.async_read_some(asio::buffer(raw_buffer, BUFFER_SIZE),
             [&](asio::error_code const& ec, std::size_t length) {
-                std::scoped_lock<std::mutex> lock(mutex);
+                //std::scoped_lock<std::mutex> lock(mutex);
                 if (ec) {
                     read_data(serial);
                     return;
@@ -34,7 +34,6 @@ auto read_data(asio::serial_port& serial) -> void {
                     print_buffer[i] = raw_buffer[i];
                 print_buffer[length] = '\0';
                 std::cout << print_buffer;
-                std::cout << '\n';
                 read_data(serial);
             });
 }
