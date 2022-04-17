@@ -1,4 +1,4 @@
-project 'SerialREPL'
+project 'serialrepl'
   kind 'ConsoleApp'
   language 'C++'
   staticruntime 'On'
@@ -33,10 +33,6 @@ project 'SerialREPL'
     buildoptions {
       '-pedantic',
       '-Werror'
-    }
-
-    links {
-      'ncurses'
     }
 
   filter 'system:macosx'

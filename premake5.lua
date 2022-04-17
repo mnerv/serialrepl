@@ -1,10 +1,9 @@
-workspace 'cpp-premake-template'
+workspace 'serialrepl'
   configurations {
     'debug',
     'release'
   }
 
 -- Include projects
-include 'HelloSerial'
-include 'SerialREPL'
+include 'serialrepl'
 
